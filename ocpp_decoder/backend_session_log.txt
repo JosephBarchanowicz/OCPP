@@ -1,0 +1,17 @@
+[2,"200","BootNotification",{"chargePointVendor":"ABB","chargePointModel":"Terra54"}]
+[3,"200",{"status":"Accepted","currentTime":"2025-01-05T11:00:00Z","interval":300}]
+
+[2,"201","Authorize",{"idTag":"RFID001"}]
+[3,"201",{"idTagInfo":{"status":"Accepted"}}]
+
+[2,"202","StartTransaction",{"connectorId":1,"meterStart":15020,"timestamp":"2025-01-05T11:01:00Z","idTag":"RFID001"}]
+[3,"202",{"transactionId":55,"idTagInfo":{"status":"Accepted"}}]
+
+[2,"203","StatusNotification",{"connectorId":1,"status":"Charging","errorCode":"NoError"}]
+
+[2,"204","MeterValues",{"connectorId":1,"transactionId":55,"meterValue":[{"timestamp":"2025-01-05T11:05:00Z","sampledValue":[{"value":"15110"}]}]}]
+
+[2,"205","MeterValues",{"connectorId":1,"transactionId":55,"meterValue":[{"timestamp":"2025-01-05T11:10:00Z","sampledValue":[{"value":"15200"}]}]}]
+
+[2,"206","StopTransaction",{"transactionId":55,"meterStop":15240,"timestamp":"2025-01-05T11:15:00Z","reason":"EVDisconnected"}]
+[3,"206",{"idTagInfo":{"status":"Accepted"}}]
