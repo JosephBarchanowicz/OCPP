@@ -56,7 +56,7 @@ def decode_ocpp_frame(raw: str):
 
 if __name__ == "__main__":
     if sys.stdin.isatty():
-        example = '[2,"123","BootNotification",{"chargePointVendor":"ACME","chargePointModel":"X100"}]'
+        example = '[2,"123","BootNotification",{"Vendor":"ACME","Model":"X100"}]'
         decode_ocpp_frame(example)
     else:
         for line in sys.stdin:
