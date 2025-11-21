@@ -1,130 +1,65 @@
-import asyncio
 import json
-from datetime import datetime, timezone
-
-import websockets
-
-LOG_FILE = "ocpp_sniffer.log"  # JSON lines
+import sys
+from pprint import pprint
 
 
 def decode_ocpp_frame(raw: str):
-    """
-    Decode a raw OCPP JSON frame into a friendly dict.
-    Frame format: [MessageTypeId, UniqueId, Action?, Payload?]
-    """
     try:
         frame = json.loads(raw)
-    except json.JSONDecodeError:
-        return {"error": "invalid_json", "raw": raw}
+    except json.JSONDecodeError as e:
+        print("Invalid JSON:", e)
+        print("Raw:", raw)
+        return
 
     if not isinstance(frame, list) or len(frame) < 2:
-        return {"error": "invalid_frame_structure", "raw": raw}
+        print("Invalid OCPP frame structure")
+        print("Frame:", frame)
+        return
 
     msg_type = frame[0]
     uid = frame[1]
 
-    if msg_type == 2:  # CALL (charger -> CSMS)
-        if len(frame) != 4:
-            return {"error": "invalid_call_frame", "raw": raw}
+    print("============================================")
+    print(f"Raw frame: {raw}")
+    print("--------------------------------------------")
+    print(f"MessageTypeId: {msg_type}")
+    print(f"UniqueId: {uid}")
+
+    if msg_type == 2:
         action = frame[2]
         payload = frame[3]
-        return {
-            "direction": "from_cp",
-            "messageTypeId": msg_type,
-            "uniqueId": uid,
-            "action": action,
-            "payload": payload,
-        }
+        print(f"Type: CALL (charger -> CSMS)")
+        print(f"Action: {action}")
+        print("Payload:")
+        pprint(payload)
 
-    elif msg_type == 3:  # CALLRESULT
-        if len(frame) != 3:
-            return {"error": "invalid_callresult_frame", "raw": raw}
+    elif msg_type == 3:
         payload = frame[2]
-        return {
-            "direction": "from_csms",
-            "messageTypeId": msg_type,
-            "uniqueId": uid,
-            "payload": payload,
-        }
+        print(f"Type: CALLRESULT (response)")
+        print("Payload:")
+        pprint(payload)
 
-    elif msg_type == 4:  # CALLERROR
-        # [4, "uid", "errorCode", "errorDescription", {errorDetails}]
-        return {
-            "direction": "error",
-            "messageTypeId": msg_type,
-            "uniqueId": uid,
-            "errorCode": frame[2] if len(frame) > 2 else None,
-            "errorDescription": frame[3] if len(frame) > 3 else None,
-            "errorDetails": frame[4] if len(frame) > 4 else None,
-        }
+    elif msg_type == 4:
+        error_code = frame[2] if len(frame) > 2 else None
+        error_desc = frame[3] if len(frame) > 3 else None
+        error_details = frame[4] if len(frame) > 4 else {}
+        print(f"Type: CALLERROR")
+        print(f"Error Code: {error_code}")
+        print(f"Error Description: {error_desc}")
+        print("Error Details:")
+        pprint(error_details)
 
     else:
-        return {"error": "unknown_message_type", "raw": raw}
-
-
-def log_event(cp_id: str, raw_message: str):
-    """Append a structured JSON line to the log file."""
-    decoded = decode_ocpp_frame(raw_message)
-    record = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "charge_point_id": cp_id,
-        "raw": raw_message,
-        "decoded": decoded,
-    }
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record) + "\n")
-
-
-async def ws_handler(websocket, path):
-    cp_id = path.strip("/") or "unknown_cp"
-    print(f"[+] Charger connected: {cp_id}")
-
-    try:
-        async for message in websocket:
-            # Log to file
-            log_event(cp_id, message)
-
-            decoded = decode_ocpp_frame(message)
-
-            # Simple console summary for quick troubleshooting
-            print("--------------------------------------------------")
-            print(f"Time (UTC): {datetime.now(timezone.utc).isoformat()}")
-            print(f"Charge Point: {cp_id}")
-            if "error" in decoded and decoded["error"]:
-                print("!! ERROR DECODING FRAME !!")
-                print(decoded)
-            else:
-                print(f"Type: {decoded.get('messageTypeId')}")
-                print(f"UniqueId: {decoded.get('uniqueId')}")
-                action = decoded.get("action")
-                if action:
-                    print(f"Action: {action}")
-
-                payload = decoded.get("payload")
-                if isinstance(payload, dict):
-                    # Show a few key fields commonly used for troubleshooting
-                    for key in ["status", "errorCode", "connectorId", "idTag", "meterStart", "meterStop"]:
-                        if key in payload:
-                            print(f"{key}: {payload[key]}")
-
-            # This sniffer doesn't reply; chargers may time out if they expect proper OCPP
-            # For pure sniffing in a lab, that’s fine.
-            # To behave like a real CSMS, you'd implement proper responses here.
-
-    except websockets.ConnectionClosed:
-        print(f"[-] Charger disconnected: {cp_id}")
-
-
-async def main():
-    async with websockets.serve(
-        ws_handler,
-        "0.0.0.0",
-        9000,
-        subprotocols=["ocpp1.6"],  # many chargers require this
-    ):
-        print("OCPP sniffer listening on ws://0.0.0.0:9000 (subprotocol ocpp1.6)")
-        await asyncio.Future()  # run forever
+        print("Unknown MessageTypeId, dumping frame:")
+        pprint(frame)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    if sys.stdin.isatty():
+        example = '[2,"123","BootNotification",{"chargePointVendor":"ACME","chargePointModel":"X100"}]'
+        decode_ocpp_frame(example)
+    else:
+        for line in sys.stdin:
+            line = line.strip()
+            if line:
+                decode_ocpp_frame(line)
